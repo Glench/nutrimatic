@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <style type="text/css">
+            html, body {
+                margin: 0;
+                padding: 0;
+                font-size: 13px;
+                font-family: Helvetica, Arial, sans-serif;
+                line-height: 1;
+            }
+            table {
+                border-collapse: collapse;
+                border-spacing: none;
+            }
+            p {
+                margin: 0;
+            }
+            div {
+                padding-left: 25px;
+            }
+        </style>
+        <!-- <link href="" rel="stylesheet"> -->
+    </head>
+    <body>
+
+        <script src="underscore-min.js"></script>
+        <!-- <script src="http://epeli.github.io/underscore.string/lib/underscore.string.js"></script> -->
+        <script src="jquery-1.11.0.min.js"></script>
+        <script src="d3.v3.min.js" charset="utf-8"></script>
+        <script src="react-with-addons.js" charset="utf-8"></script>
+        <script src="react-dom.js" charset="utf-8"></script>
+        <script src="react-dom.js" charset="utf-8"></script>
+        <script type="text/javascript" src="../node_modules/ohm-js/dist/ohm.js"></script>
+        <script type="text/ohm-js">
+            Nutrimatic {
+
+            Exp = 
+                smallExp+
+                
+            group = 
+                "(" smallExp+ ")"
+              | "[" smallExp+ "]"
+              | "<" smallExp+ ">"
+              | "\"" smallExp+ "\""
+
+            // currently there's a bug in binary operators, aa*&bb*&cc* is parsed (a)(a* & ...) instead of a(a*))&...
+            binaryOperatorExp =
+                smallExp+ binaryOperator smallExp+
+
+            binaryOperator = 
+                "&"
+              | "|"
+              
+            unitOperatorExp =
+                (group|literal) unitOperator
+
+            unitOperator =
+                "+"
+              | "?"
+              | "*"
+              | countExp
+              
+            countExp = "{" digit+ ","? (space* digit+)? "}" // valid: {5}, {5,}, {5,10}
+
+            smallExp =
+                binaryOperatorExp
+              | unitOperatorExp
+              | group
+              | literals
+
+            literals = (literal ~unitOperator)+ // matches `abc` and also turns abz+ into (ab)(z+)
+
+            literal =
+                specialCharacter
+              | literalLiteral
+
+            specialCharacter =
+                "#"
+              | "A" // alphabetic a-z
+              | "C" // consonant including y
+              | "V" // vowel
+              | "-" // optional space
+              | "_" // alphanumeric
+              | "." // match 0 or more of any character
+
+            literalLiteral = 
+                letter
+              | digit 
+            }
+        </script>
+        <script type="text/javascript">
+            $(document).on("ready", function(evt) {
+                var grammar = ohm.grammarFromScriptElement();
+                var semantics = grammar.createSemantics();
+
+                function div(classes, children) {
+                    return '<div class="'+ classes.join(' ') +'">'+ children +'</div>\n'
+                };
+
+
+                semantics.addOperation('interpret', {
+                    Exp: function(e) { return e.interpret(); },
+                    smallExp: function(e) { return e.interpret(); },
+                    group: function(leftChar, e, rightChar) { return div(['group'], e.interpret()); },
+                    unitOperatorExp: function(e, operator) {
+                        var lookup = {
+                            '+': 'one or more times',
+                            '?': '0 or one time',
+                            '*': '0 or more times'
+                        };
+                        var str = lookup[operator.sourceString];
+                        return div(['unitOperatorExp', str.replace(/ /g, '-')], e.interpret() + ' <div>ocurring</div> ' + operator.interpret());
+                    },
+                    unitOperator: function(e) {
+                        var lookup = {
+                            '+': 'one or more times',
+                            '?': '0 or one time',
+                            '*': '0 or more times'
+                        };
+                        var str = lookup[e.sourceString];
+                        return div(['unit-operator', str.replace(/ /g, '-')], str)
+                    },
+                    literals: function(e) {
+                        var str = '';
+                        e.children.forEach(subE => str += subE.interpret());
+                        return str;
+                    },
+                    specialCharacter: function(e) {
+                        var lookup = {
+                            '#': 'digit',
+                            'A': 'letter',
+                            'C': 'consonant',
+                            'V': 'vowel',
+                            '-': 'optional space',
+                            '_': 'letter/digit',
+                            '.': 'any character',
+                        };
+                        var str = lookup[e.sourceString];
+                        return div([str.replace(/ /g, '-')], str);
+                    },
+                    literalLiteral: function(e) {
+                        return div(['literal'], e.sourceString);
+                    }
+                })
+
+                var test = 'aV(ba)+'
+                console.log(test)
+                var testMatch = grammar.match(test)
+                var semanticResult = semantics(testMatch);
+                var result = semanticResult.interpret();
+                console.log(result)
+                document.body.innerHTML = '<h1>'+test+'</h1>'+result.join(' ')
+            });
+        </script>
+    </body>
+</html>
